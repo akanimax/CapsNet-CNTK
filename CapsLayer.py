@@ -2,7 +2,7 @@ import cntk as ct
 import numpy as np
 
 from cntk.ops.functions import BlockFunction
-from user_matmul import user_matmul
+
 
 def Masking(is_onehot_encoded=True, name='Masking'):
     '''
@@ -19,17 +19,20 @@ def Masking(is_onehot_encoded=True, name='Masking'):
     def masking(input, labels):
 
         if not is_onehot_encoded:
-            mask = ct.reshape(ct.one_hot(ct.reshape(ct.argmax(labels, axis=0), shape=(-1,)), 10), shape=(10, 1, 1))
+            mask = ct.reshape(
+                ct.one_hot(ct.reshape(ct.argmax(labels, axis=0), shape=(-1,)),
+                           10), shape=(10, 1, 1))
             mask = ct.stop_gradient(mask)
         else:
             mask = ct.reshape(labels, shape=(10, 1, 1))
 
-        mask = ct.splice(*([mask]*16), axis=1)
+        mask = ct.splice(*([mask] * 16), axis=1)
         return ct.reshape(ct.element_times(input, mask), shape=(-1,))
 
     return masking
 
-def Length(name='Length', epsilon = 1e-9):
+
+def Length(name='Length', epsilon=1e-9):
     '''
     Length of the instantiation vector to represent the probability that a capsule’s entity exists.
 
@@ -48,7 +51,9 @@ def Length(name='Length', epsilon = 1e-9):
 
     return length
 
-def DigitCaps(input, num_capsules, dim_out_vector, routings=3, name='DigitCaps'):
+
+def DigitCaps(input, num_capsules, dim_out_vector, routings=3,
+              name='DigitCaps'):
     '''
     Function to create an instance of a digit capsule.
 
@@ -60,7 +65,8 @@ def DigitCaps(input, num_capsules, dim_out_vector, routings=3, name='DigitCaps')
         name (str, optional): The name of the Function instance in the network.
     '''
     # Learnable Parameters
-    W = ct.Parameter(shape=(1152, 10, 16, 8), init=ct.normal(0.01), name=name + '_Weights')
+    W = ct.Parameter(shape=(1152, 10, 16, 8), init=ct.normal(0.01),
+                     name=name + '_Weights')
 
     # reshape input for broadcasting on all output capsules
     input = ct.reshape(input, (1152, 1, 1, 8), name='reshape_input')
@@ -84,7 +90,8 @@ def DigitCaps(input, num_capsules, dim_out_vector, routings=3, name='DigitCaps')
         if r_iter == routings - 1:
             # line 5: for all capsule j in layer (l + 1): sj ← sum(cij * u_hat)
             # Output shape = [#][1152, 10, 16, 1]
-            Sj = ct.reduce_sum(ct.element_times(Cij, u_hat, 'weighted_u_hat'), axis=0)
+            Sj = ct.reduce_sum(ct.element_times(Cij, u_hat, 'weighted_u_hat'),
+                               axis=0)
 
             # line 6: for all capsule j in layer (l + 1): vj ← squash(sj)
             # Output shape = [#][1, 10, 16, 1]
@@ -100,17 +107,22 @@ def DigitCaps(input, num_capsules, dim_out_vector, routings=3, name='DigitCaps')
 
             # line 7: for all capsule i in layer l and capsule j in layer (l + 1): bij ← bij + ^uj|i * vj
             # Output shape = [#][1, 10, 1, 16]
-            Vj_Transpose = ct.transpose(ct.reshape(Vj, (1, 10, 16, 1)), (0, 1, 3, 2), name='Vj_Transpose')
+            Vj_Transpose = ct.transpose(ct.reshape(Vj, (1, 10, 16, 1)),
+                                        (0, 1, 3, 2), name='Vj_Transpose')
 
             # Output shape = [#][1152, 10, 1, 1]
-            UV = ct.reduce_sum(ct.reshape(u_hat_stopped, (1152, 10, 1, 16)) * Vj_Transpose, axis=3)
+            UV = ct.reduce_sum(
+                ct.reshape(u_hat_stopped, (1152, 10, 1, 16)) * Vj_Transpose,
+                axis=3)
             Bij += UV
 
     # Output shape = [#][10, 16, 1]
     Vj = ct.reshape(Vj, (10, 16, 1), name='digit_caps_output')
     return Vj
 
-def PrimaryCaps(num_capsules, dim_out_vector, filter_shape, strides=1, pad=False, name='PrimaryCaps'):
+
+def PrimaryCaps(num_capsules, dim_out_vector, filter_shape, strides=1,
+                pad=False, name='PrimaryCaps'):
     """
     PrimaryCaps()
     Layer factory function to create an instance of a primary capsule.
@@ -124,20 +136,23 @@ def PrimaryCaps(num_capsules, dim_out_vector, filter_shape, strides=1, pad=False
         cntk.ops.functions.Function
     """
 
-    convolution = ct.layers.Convolution2D(num_filters=dim_out_vector*num_capsules,
-                                          filter_shape=filter_shape,
-                                          strides=strides,
-                                          pad=pad,
-                                          activation=ct.relu,
-                                          name=name + '_conv')
+    convolution = ct.layers.Convolution2D(
+        num_filters=dim_out_vector * num_capsules,
+        filter_shape=filter_shape,
+        strides=strides,
+        pad=pad,
+        activation=ct.relu,
+        name=name + '_conv')
 
     @BlockFunction('PrimaryCaps', name)
     def primaryCaps(input):
         result = convolution(input)
-        result = ct.reshape(result, (-1, dim_out_vector), name=name + '_reshape')
+        result = ct.reshape(result, (-1, dim_out_vector),
+                            name=name + '_reshape')
         return Squash(result, axis=-1)
 
     return primaryCaps
+
 
 def Squash(Sj, axis=-1, name='', epsilon=1e-9):
     '''
@@ -157,7 +172,6 @@ def Squash(Sj, axis=-1, name='', epsilon=1e-9):
 
     @BlockFunction('Squash', name)
     def squash(input):
-
         # ||Sj||^2
         Sj_squared_norm = ct.reduce_sum(ct.square(input), axis=axis)
 

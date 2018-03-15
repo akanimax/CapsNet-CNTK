@@ -1,13 +1,14 @@
 from __future__ import print_function
-import numpy as np
+
 import cntk as ct
 
 from CapsLayer import PrimaryCaps, DigitCaps, Length, Masking
 
+
 class CapsNet(object):
-    '''
+    """
     Capsule Net Architecture (Sara Sabour, et al. 2017, "Dynamic Routing Between Capsules")
-    '''
+    """
 
     def __init__(self, features, labels, routings=3, use_reconstruction=True):
         self.features = features
@@ -20,21 +21,25 @@ class CapsNet(object):
         CapsNet Architecture model generation
         """
 
-        # Layer1: ..."The architecture is shallow with only two convolutional layers and one fully
-        # connected layer. Conv1 has 256, 9 × 9 convolution kernels with a stride of 1 and ReLU
-        # activation. This layer converts pixel intensities to the activities of local feature
-        # detectors that are then used as inputs to the primary capsules."
+        # Layer1: ..."The architecture is shallow with only two convolutional
+        #  layers and one fully connected layer. Conv1 has 256,
+        # 9 × 9 convolution kernels with a stride of 1 and ReLU activation.
+        # This layer converts pixel intensities to the activities of local
+        # feature detectors that are then used as inputs to the primary
+        # capsules."
         conv1 = ct.layers.Convolution2D(num_filters=256, filter_shape=9, strides=1,
                                         pad=False, activation=ct.relu, name='Conv1')(self.features)
 
-        # Layer2: ... "The second layer (PrimaryCapsules) is a convolutional capsule layer with 32
-        # channels of convolutional 8D capsules (i.e. each primary capsule contains 8
-        # convolutional units with a 9 × 9 kernel and a stride of 2).
+        # Layer2: ... "The second layer (PrimaryCapsules) is a convolutional
+        # capsule layer with 32 channels of convolutional 8D capsules (i.e.
+        # each primary capsule contains 8 convolutional units with a 9 × 9
+        # kernel and a stride of 2).
         primary = PrimaryCaps(num_capsules=32, dim_out_vector=8, filter_shape=9, strides=2, pad=False,
                               name='PrimaryCaps')(conv1)
 
-        # Layer 3: .. "The final Layer (DigitCaps) has one 16D capsule per digit class and each of
-        # these capsules receives input from all the capsules in the layer below."
+        # Layer 3: .. "The final Layer (DigitCaps) has one 16D capsule per
+        # digit class and each of these capsules receives input from all the
+        # capsules in the layer below."
         self.digitcaps = DigitCaps(primary, num_capsules=10, dim_out_vector=16, routings=self.routings, name='DigitCaps')
         self.training_model = self.digitcaps
 
